@@ -1,5 +1,5 @@
-# PyNetwork_FaceDetection
-- Face detection using OpenCV library
+# PyCord - Chat between clients
+- Text app through Python socket programming
 
 ### Currently under development
 
