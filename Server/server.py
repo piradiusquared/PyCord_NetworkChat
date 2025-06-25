@@ -8,11 +8,8 @@ sel = selectors.DefaultSelector()
 
 # Command line arguments for host and ports
 
-# host = int(sys.argv[1])
-# port = int(sys.argv[2])
-
-host = "127.0.0.1"
-port = 12345
+# host = sys.argv[1]
+port = int(sys.argv[1])
 
 # Functions
 def accept_wrapper(sock: socket.socket):
@@ -42,17 +39,19 @@ def service_connection(key: selectors.SelectorKey, mask):
             data.outb = data.outb[sent:]
 
 lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-lsock.bind((host, port))
+lsock.bind(("127.0.0.1", port))
 lsock.listen()
-print(f"Listening on {(host, port)}")
-lsock.setblocking(False) # Prevent blocking of system calls. i.e. Allow system 
-#to catch immediate ^C calls and terminate server
+print(f"Listening on {("127.0.0.1", port)}")
+lsock.setblocking(False) # Prevent blocking of system calls, i.e. allows 
+                         # sockets to handle multiple client requests
 
 sel.register(lsock, selectors.EVENT_READ, data=None)
 
 try:
     while True:
-        events = sel.select(timeout=None) # Blocks until sockets are available
+        events = sel.select(timeout=1) # Timouts for 1 second waiting for new
+                                       # connections. Allows 1 second before 
+                                       # terminating server if ^C received
         for key, mask in events:
             if key.data is None:
                 accept_wrapper(key.fileobj)
