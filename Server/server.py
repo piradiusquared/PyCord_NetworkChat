@@ -28,15 +28,17 @@ def service_connection(key: selectors.SelectorKey, mask):
         recv_data = sock.recv(1024)
         if recv_data:
             data.outb += recv_data
+        elif recv_data == 0:
+            print("Nothing received")
         else:
             print(f"EOF received, closing connection to {data.addr}")
             sel.unregister(sock)
             sock.close()
     if mask & selectors.EVENT_WRITE:
         if data.outb:
-            print(f"Echoing {data.outb!r} to {data.addr}")
+            print(f"Echoing {data.outb.decode()} to {data.addr}") # Decode to print as string
             sent = sock.send(data.outb)
-            data.outb = data.outb[sent:]
+            data.outb = data.outb[sent:] # Index list to make blank
 
 lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 lsock.bind(("127.0.0.1", port))
