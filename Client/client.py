@@ -29,7 +29,7 @@ class TestCases:
                 messages=messages.copy(),
                 outb=b"",
             )
-            sel.register(sock, events, data=data)
+            sel.register(sock, events, data=data) 
 
 def create_connection(host, port):
     server_addr = (host, port)
