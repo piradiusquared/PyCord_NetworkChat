@@ -6,14 +6,13 @@ import types
 from clientSupport import *
 
 class TestCases:
-    sel = selectors.DefaultSelector()
-
     def __init__(self, host, port, num_conns) -> types.NoneType:
         self._host = host
         self._port = port
         self._num_conns = num_conns
 
     def test_multiple_connections(host, port, num_conns) -> None:
+        sel = selectors.DefaultSelector()
         messages = [b"Hi this is the client", b"Hi, another message from client!"]
         server_addr = (host, port)
         for i in range(0, num_conns):
@@ -58,9 +57,8 @@ def create_connection(host, port):
                 sock.send(a.encode())
                 receive = sock.recv(1024).decode() # Currently only support receiving 1024 bytes
                                                # Future addition: allow larger transmission of reasonable size
-                print(f"Server sent: {receive}")
+                print(receive)
             
-
 
     except KeyboardInterrupt:
         print("Interrupted, aborting...")
@@ -74,8 +72,10 @@ def main():
         exit(USAGE_EXIT) # Exit code 8
 
     port = int(sys.argv[1]) # Get port specified by user
-    
-    create_connection("127.0.0.1", port)    
+    hostname = socket.gethostname()
+    ip_addr = socket.gethostbyname(hostname)
+    print(f"hostname is {hostname}, ip addr is {ip_addr}") 
+    create_connection(ip_addr, port)    
     
     return 0
 
