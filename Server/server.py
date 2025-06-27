@@ -2,6 +2,7 @@ import sys
 import socket
 import types
 import selectors
+from typing import Optional
 
 # Globals
 sel = selectors.DefaultSelector()
@@ -9,7 +10,8 @@ sel = selectors.DefaultSelector()
 # Command line arguments for host and ports
 
 # host = sys.argv[1]
-port = int(sys.argv[1])
+cmd_port = int(sys.argv[1]) # Only works for ints currently
+                            # Accept empty string and error when non-digit 
 
 # Functions
 def accept_wrapper(sock: socket.socket):
@@ -37,29 +39,59 @@ def service_connection(key: selectors.SelectorKey, mask):
     if mask & selectors.EVENT_WRITE:
         if data.outb:
             print(f"Echoing {data.outb.decode()} to {data.addr}") # Decode to print as string
-            sent = sock.send(data.outb)
+            sent = sock.send("Server has sent: ".encode() + data.outb) # Send received data back to client without changes
             data.outb = data.outb[sent:] # Index list to make blank
 
-lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-lsock.bind(("127.0.0.1", port))
-lsock.listen()
-print(f"Listening on {("127.0.0.1", port)}")
-lsock.setblocking(False) # Prevent blocking of system calls, i.e. allows 
-                         # sockets to handle multiple client requests
+# Setup function (split it up into smaller chunks later)
+class ServerSetup:
+    def __init__(self, host: Optional[str], port: Optional[int]) -> types.NoneType:
+        if host == None:
+            # Get private ip address through currently connected WiFi
+            self._host = socket.gethostbyname(socket.gethostname())
+        else:
+            self._host = host
+        
+        if port == None: # No port specified, set as ephemeral port
+            self._port = 0
+        else:
+            self._port = port
 
-sel.register(lsock, selectors.EVENT_READ, data=None)
+    def get_host(self) -> str:
+        return self._host
 
-try:
-    while True:
-        events = sel.select(timeout=1) # Timouts for 1 second waiting for new
-                                       # connections. Allows 1 second before 
-                                       # terminating server if ^C received
-        for key, mask in events:
-            if key.data is None:
-                accept_wrapper(key.fileobj)
-            else:
-                service_connection(key, mask)
-except KeyboardInterrupt:
-    print("Keyboard Interrupt, aborting...")
-finally:
-    sel.close()
+    def get_port(self) -> int:
+        return self._port
+
+    def init_server(self):
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        hostname = socket.gethostname()
+        host = self.get_host()
+        port = self.get_port()
+        print(f"hostname is {hostname}, ip addr is {host}") 
+
+        sock.bind((host, port))
+        sock.listen()
+        print(f"Listening on {(host, sock.getsockname()[1])}")
+        sock.setblocking(False) # Prevent blocking of system calls, i.e. allows 
+                                # sockets to handle multiple client requests
+
+        sel.register(sock, selectors.EVENT_READ, data=None)
+
+        try:
+            while True:
+                events = sel.select(timeout=1) # Timouts for 1 second waiting for new
+                                            # connections. Allows 1 second before 
+                                            # terminating server if ^C received
+                for key, mask in events:
+                    if key.data is None:
+                        accept_wrapper(key.fileobj)
+                    else:
+                        service_connection(key, mask)
+        except KeyboardInterrupt:
+            print("Keyboard Interrupt, aborting...")
+        finally:
+            sel.close()
+
+server = ServerSetup(None, cmd_port)
+server.init_server()
