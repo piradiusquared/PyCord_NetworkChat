@@ -1,0 +1,3 @@
+# Prefixes
+USERNAME_PREFIX = "khxz6qj65q14i5h_"
+USERNAME_LEN = len(USERNAME_PREFIX)
