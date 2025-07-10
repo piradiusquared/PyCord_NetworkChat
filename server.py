@@ -16,55 +16,10 @@ cmd_port = int(sys.argv[1]) # Only works for ints currently
                             # Accept empty string and error when non-digit 
 
 # Storage of user and their ip and port
-addr_rec = {}
+addr_rec = {} # Format is addr tuple: username
 client_name = ""
 # Change to dictionary. Key being username and value being the ip port tuple
 
-# Functions
-def accept_wrapper(sock: socket.socket):
-    conn, addr = sock.accept()
-    print(f"Accepted connection from {addr}")
-
-    active_conns = "Currently active connections:"
-    for i in addr_rec: # Send username and ip, port of user
-        active_conns += (f"\nUser {i}: IP = {addr_rec[i][0]}, Port = {addr_rec[i][1]}")
-    conn.send(active_conns.encode()) # Use conn.send not sock.send 
-
-    conn.setblocking(False)
-    data = types.SimpleNamespace(addr=addr, inb=b"", outb=b"")
-    events = selectors.EVENT_READ | selectors.EVENT_WRITE # Accept read and writing for client
-    sel.register(conn, events, data=data)
-
-def service_connection(key: selectors.SelectorKey, mask):
-    sock = key.fileobj # Key holds socket information
-    # .fileobj is the socket representation
-    data = key.data
-
-    if mask & selectors.EVENT_READ:
-        recv_data = sock.recv(1024)
-        if recv_data:
-            if USERNAME_PREFIX in recv_data.decode():
-                username = recv_data[USERNAME_LEN::].decode()
-                addr_rec[username] = data.addr
-                # addr is tuple in form (ip addr, client port num)
-                return
-            data.outb += recv_data
-        else:
-            print(f"EOF received, closing connection to {data.addr}")
-            sel.unregister(sock)
-            sock.close()
-    if mask & selectors.EVENT_WRITE:
-        if data.outb:
-            print(f"Echoing {data.outb.decode()} to {data.addr}") # Decode to print as string
-            sent = sock.send("Server has sent: ".encode() + data.outb) # Send received data back to client without changes
-            data.outb = data.outb[sent:] # Index list to make blank
-
-def print_all_keys(key: selectors.SelectorKey):
-    
-    for i in range(4):
-        print(key[i])
-
-# Setup function (split it up into smaller chunks later)
 class ServerSetup:
     def __init__(self, host: Optional[str], port: Optional[int]) -> types.NoneType:
         if host == None:
@@ -83,6 +38,45 @@ class ServerSetup:
 
     def get_port(self) -> int:
         return self._port
+    
+    def accept_wrapper(self, sock: socket.socket):
+        conn, addr = sock.accept()
+        print(f"Accepted connection from {addr}")
+
+        active_conns = "Currently active connections:"
+        for i in addr_rec: # Send username and ip, port of user
+            active_conns += (f"\nUser {addr_rec[i]}: IP = {i[0]}, Port = {i[1]}")
+        conn.send(active_conns.encode()) # Use conn.send not sock.send 
+
+        conn.setblocking(False)
+        data = types.SimpleNamespace(addr=addr, inb=b"", outb=b"")
+        events = selectors.EVENT_READ | selectors.EVENT_WRITE # Accept read and writing for client
+        sel.register(conn, events, data=data)
+
+    def service_connection(self, key: selectors.SelectorKey, mask):
+        sock = key.fileobj # Key holds socket information
+        # .fileobj is the socket representation
+        data = key.data
+
+        if mask & selectors.EVENT_READ:
+            recv_data = sock.recv(1024)
+            if recv_data:
+                if USERNAME_PREFIX in recv_data.decode():
+                    username = recv_data[USERNAME_LEN::].decode()
+                    addr_rec[data.addr] = username
+                    # addr is tuple in form (ip addr, client port num)
+                    return
+                data.outb += recv_data
+            else:
+                print(f"EOF received, closing connection to {data.addr}")
+                addr_rec.pop(data.addr)
+                sel.unregister(sock)
+                sock.close()
+        if mask & selectors.EVENT_WRITE:
+            if data.outb:
+                print(f"Echoing {data.outb.decode()} to {data.addr}") # Decode to print as string
+                sent = sock.send("Server has sent: ".encode() + data.outb) # Send received data back to client without changes
+                data.outb = data.outb[sent:] # Index list to make blank
 
     def init_server(self):
 
@@ -107,9 +101,9 @@ class ServerSetup:
                                             # terminating server if ^C received
                 for key, mask in events:
                     if key.data is None:
-                        accept_wrapper(key.fileobj)
+                        self.accept_wrapper(key.fileobj)
                     else:
-                        service_connection(key, mask)
+                        self.service_connection(key, mask)
         except KeyboardInterrupt:
             print("Keyboard Interrupt, aborting...")
             print(f"Total connections: {len(addr_rec)}\nActive connections: {addr_rec}")
